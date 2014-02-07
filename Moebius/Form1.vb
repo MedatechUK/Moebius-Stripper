@@ -2,7 +2,7 @@
 
     Private Sub Form1_Load(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles MyBase.Load
         Dim objIniFile As New IniFile(My.Computer.FileSystem.CurrentDirectory & "/settings.ini")
-        Dim ircserver As String = objIniFile.GetString("Moebius", "server", "irc.wyldryde.org")
+        Dim ircserver As String = objIniFile.GetString("Moebius", "server", "irc.emerge-it.org")
         Dim nick As String = objIniFile.GetString("Moebius", "nick", "Moebius")
         Me.Text = nick & " on " & ircserver
         BackgroundWorker1.RunWorkerAsync()
