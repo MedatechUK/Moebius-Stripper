@@ -74,12 +74,21 @@ Module Module1
                 Else
                     v = True
                     mail = mail.Replace("define", "").Split(":").Last
-                    'known to contain define if it didn't contain def
                 End If
                 mail = mail.Trim
                 sendChannel({"defining: ", mail})
-                ' send("PRIVMSG " & channel & " :" & "defining: " & mail)
                 DictDef(mail, v)
+
+            ElseIf mail.Contains("google:") Or mail.Contains("ggl:") Then
+                mail = mail.Split(">").Last
+                If mail.Contains("ggl:") Then
+                    mail = mail.Replace("ggl", "").Split(":").Last
+                Else
+                    mail = mail.Replace("google", "").Split(":").Last
+                End If
+                mail = mail.Trim
+                sendChannel({"googling: ", mail})
+                Google(mail)
             Else
 
             End If
@@ -115,45 +124,81 @@ Module Module1
             If Not verbose And j = 3 Then
                 Exit Sub
             End If
-            j += 1
+
             sendChannel({" ", j, ") ", i.InnerText.Replace(":", "")})
+            j += 1
         Next
         If j = 0 Then
-
             sendChannel({" ", "Nothing found :("})
+            GoogleDef(mail)
+        End If
 
-            urlbuild = Function(word)
+    End Sub
+
+    Public Sub GoogleDef(ByVal mail As String)
+        Dim j As Integer = 0
+        Dim ht As New Net.WebClient
+        Dim urlbuild = Function(word)
                            Dim url As String = _
                                "http://suggestqueries.google.com/complete/search?client=chrome&q="
                            url &= word
                            Return url
                        End Function
 
-            Dim jss As New JavaScriptSerializer
+        Dim jss As New JavaScriptSerializer
 
-            Dim x As List(Of Object) = jss.Deserialize(Of List(Of Object))( _
-            ht.DownloadString(urlbuild(mail)))
+        Dim x As List(Of Object) = jss.Deserialize(Of List(Of Object))( _
+        ht.DownloadString(urlbuild(mail)))
 
-            For Each i As String In x(1)
-                If j = 0 Then
-                    sendChannel({"Did you mean: "})
-                End If
-                If j = 3 Then
-                    Exit Sub
-                End If
-                j += 1
-                sendChannel({" ", j, ") ", i, "?"})
-            Next
-
+        For Each i As String In x(1)
             If j = 0 Then
-                sendChannel({" ", "Not even google can help you now"})
+                sendChannel({"Did you mean: "})
+            End If
+            If j = 3 Then
+                Exit Sub
             End If
 
-        End If
+            sendChannel({" ", j, ") ", i, "?"})
+            j += 1
+        Next
 
+        If j = 0 Then
+            sendChannel({" ", "Not even google can help you now"})
+        End If
     End Sub
 
+    Public Sub Google(ByVal mail As String)
+        Dim j As Integer = 0
+        Dim ht As New Net.WebClient
 
+        Dim urlbuild = Function(word)
+                           Dim url As String = _
+                               "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&q="
+                           url &= word
+                           Return url
+                       End Function
+
+        Dim y As String = urlbuild(mail)
+        Dim jss As New JavaScriptSerializer
+
+        Dim response As Dictionary(Of String, Object) = jss.Deserialize(Of Dictionary(Of String, Object))( _
+        ht.DownloadString(urlbuild(mail)))
+
+
+        For Each i As Dictionary(Of String, Object) In response("responseData")("results")
+
+            sendChannel({" ", j, ") ", i("titleNoFormatting")})
+            sendChannel({"    ", i("url")})
+            j += 1
+            If j = 3 Then
+                Exit Sub
+            End If
+        Next
+
+        If j = 0 Then
+            sendChannel({" ", "Not even google can help you now"})
+        End If
+    End Sub
 
     Public Sub sendConnectCommands()
         send("NICK " & nick)
