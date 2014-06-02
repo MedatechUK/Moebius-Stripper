@@ -1,9 +1,12 @@
-﻿Imports System.Net.Sockets
+Imports System.Net.Sockets
 Imports System.Text
 Imports System.Text.RegularExpressions
 Imports System.Threading
+Imports System.Web.Script.Serialization
 
 Module Module1
+
+    Private _dictKey As String = "d0d90723-3851-4c65-8c04-dea85de4051f"
     Dim cout As System.IO.TextWriter = Console.Out
     Dim cin As System.IO.TextReader = Console.In
 
@@ -11,7 +14,7 @@ Module Module1
     Dim objIniFile As New IniFile(My.Computer.FileSystem.CurrentDirectory & "/settings.ini")
     Public ircserver As String = objIniFile.GetString("Moebius", "server", "irc.emerge-it.co.uk")
     Public port As Integer = objIniFile.GetInteger("Moebius", "port", 6667)
-    Public nick As String = objIniFile.GetString("Moebius", "nick", "Moebius Stripper")
+    Public nick As String = objIniFile.GetString("Moebius", "nick", "Moebius")
     Public channel As String = objIniFile.GetString("Moebius", "channel", "#dev")
     Public identifywithnickserv As Boolean = objIniFile.GetBoolean("Moebius", "ns-identify", False)
     Public nickservpass As String = objIniFile.GetString("Moebius", "ns-pass", "")
@@ -40,7 +43,7 @@ Module Module1
         While sock.Connected = True
             Dim mail As String = recv()
             Debug.WriteLine(mail)
-            If  mail.EndsWith(nick & ": shutdown -r now") Then
+            If mail.EndsWith(nick & ": shutdown -r now") Then
                 Debug.WriteLine("---> Disconnecting and reconnecting.")
                 send("QUIT")
                 sock.Close()
@@ -62,8 +65,20 @@ Module Module1
                 send("PRIVMSG " & channel & " :" & baz)
             ElseIf mail.Contains(nick & ", -R") Then
                 rickroll(mail)
-            ElseIf mail.Contains("define") Or mail.Contains("def:") Then
-                send("PRIVMSG " & channel & " : MOTHERFUCKER THAT FUNCTIONALITY AIN'T THERE YET!")
+            ElseIf mail.Contains("define:") Or mail.Contains("def:") Then
+                Dim v As Boolean = False
+                mail = mail.Split(">").Last
+
+                If mail.Contains("def:") Then
+                    mail = mail.Replace("def", "").Split(":").Last
+                Else
+                    v = True
+                    mail = mail.Replace("define", "").Split(":").Last
+                    'known to contain define if it didn't contain def
+                End If
+                mail = mail.Trim
+                send("PRIVMSG " & channel & " :" & "defining: " & mail)
+                DictDef(mail, v)
             Else
 
             End If
@@ -71,6 +86,64 @@ Module Module1
 
         End While
     End Sub
+
+    Public Sub DictDef(ByVal mail As String, verbose As Boolean)
+
+        Dim ht As New Net.WebClient
+
+        Dim urlbuild = Function(word)
+                           Dim url As String = _
+                               "http://www.dictionaryapi.com/api/v1/references/collegiate/xml/"
+                           url &= word
+                           url &= "?key="
+                           url &= _dictKey
+                           Return url
+                       End Function
+
+        Dim response As New Xml.XmlDocument()
+
+        response.LoadXml(ht.DownloadString(urlbuild(mail)))
+
+
+        Dim j As Integer = 0
+        For Each i As Xml.XmlNode In response.SelectNodes("*//dt/text()")
+            If Not verbose And j = 3 Then
+                Exit Sub
+            End If
+            j += 1
+            send("PRIVMSG " & channel & " : " & j & i.InnerText)
+        Next
+        If j = 0 Then
+
+            send("PRIVMSG " & channel & " : " & "Nothing found :(")
+
+            urlbuild = Function(word)
+                           Dim url As String = _
+                               "http://suggestqueries.google.com/complete/search?client=chrome&q="
+                           url &= word
+                           Return url
+                       End Function
+
+            Dim jss As New JavaScriptSerializer
+
+            Dim x = jss.Deserialize(Of List(Of Object))( _
+            ht.DownloadString(urlbuild(mail)))
+
+            Debug.Write(x)
+
+            For Each i As String In x(1)
+                If j = 3 Then
+                    Exit Sub
+                End If
+                j += 1
+                send("PRIVMSG " & channel & " :" & "Did you mean " & i & "?")
+            Next
+        End If
+
+
+    End Sub
+
+
 
     Public Sub sendConnectCommands()
         send("NICK " & nick)
@@ -107,6 +180,7 @@ Module Module1
     End Sub
 
     Function recv() As String
+
         Dim data(4096) As Byte
         Try
             sock.Receive(data, 4096, SocketFlags.None)
