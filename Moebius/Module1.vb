@@ -62,7 +62,7 @@ Module Module1
                 Dim bar = foo(foo.Length - 1)
                 Dim baz = mathEval(bar)
                 Debug.WriteLine("---> Evaluating " & bar & " - result: " & baz)
-                send("PRIVMSG " & channel & " :" & baz)
+                sendChannel({baz})
             ElseIf mail.Contains(nick & ", -R") Then
                 rickroll(mail)
             ElseIf mail.Contains("define:") Or mail.Contains("def:") Then
@@ -77,7 +77,8 @@ Module Module1
                     'known to contain define if it didn't contain def
                 End If
                 mail = mail.Trim
-                send("PRIVMSG " & channel & " :" & "defining: " & mail)
+                sendChannel({"defining: ", mail})
+                ' send("PRIVMSG " & channel & " :" & "defining: " & mail)
                 DictDef(mail, v)
             Else
 
@@ -85,6 +86,10 @@ Module Module1
 
 
         End While
+    End Sub
+
+    Public Sub sendChannel(args() As String)
+        send("PRIVMSG " & channel & " :" & String.Join("", args))
     End Sub
 
     Public Sub DictDef(ByVal mail As String, verbose As Boolean)
@@ -111,11 +116,11 @@ Module Module1
                 Exit Sub
             End If
             j += 1
-            send("PRIVMSG " & channel & " : " & j & i.InnerText)
+            sendChannel({" ", j, ") ", i.InnerText.Replace(":", "")})
         Next
         If j = 0 Then
 
-            send("PRIVMSG " & channel & " : " & "Nothing found :(")
+            sendChannel({" ", "Nothing found :("})
 
             urlbuild = Function(word)
                            Dim url As String = _
@@ -126,20 +131,25 @@ Module Module1
 
             Dim jss As New JavaScriptSerializer
 
-            Dim x = jss.Deserialize(Of List(Of Object))( _
+            Dim x As List(Of Object) = jss.Deserialize(Of List(Of Object))( _
             ht.DownloadString(urlbuild(mail)))
 
-            Debug.Write(x)
-
             For Each i As String In x(1)
+                If j = 0 Then
+                    sendChannel({"Did you mean: "})
+                End If
                 If j = 3 Then
                     Exit Sub
                 End If
                 j += 1
-                send("PRIVMSG " & channel & " :" & "Did you mean " & i & "?")
+                sendChannel({" ", j, ") ", i, "?"})
             Next
-        End If
 
+            If j = 0 Then
+                sendChannel({" ", "Not even google can help you now"})
+            End If
+
+        End If
 
     End Sub
 
