@@ -65,6 +65,7 @@ Module Module1
                 sendChannel({baz})
             ElseIf mail.Contains(nick & ", -R") Then
                 rickroll(mail)
+
             ElseIf mail.Contains("define:") Or mail.Contains("def:") Then
                 Dim v As Boolean = False
                 mail = mail.Split(">").Last
@@ -89,6 +90,17 @@ Module Module1
                 mail = mail.Trim
                 sendChannel({"googling: ", mail})
                 Google(mail)
+
+            ElseIf mail.Contains("so:") Or mail.Contains("stackoverflow:") Then
+                mail = mail.Split(">").Last
+                If mail.Contains("so:") Then
+                    mail = mail.Replace("so", "").Split(":").Last
+                Else
+                    mail = mail.Replace("stackoverflow", "").Split(":").Last
+                End If
+                mail = mail.Trim
+                sendChannel({"searching SO: ", mail})
+                Google("Stack Overflow " & mail)
             Else
 
             End If
@@ -199,6 +211,8 @@ Module Module1
             sendChannel({" ", "Not even google can help you now"})
         End If
     End Sub
+
+
 
     Public Sub sendConnectCommands()
         send("NICK " & nick)
