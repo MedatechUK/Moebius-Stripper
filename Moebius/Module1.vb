@@ -62,6 +62,8 @@ Module Module1
                 send("PRIVMSG " & channel & " :" & baz)
             ElseIf mail.Contains(nick & ", -R") Then
                 rickroll(mail)
+            ElseIf mail.Contains("define") Or mail.Contains("def:") Then
+                send("PRIVMSG " & channel & " : MOTHERFUCKER THAT FUNCTIONALITY AIN'T THERE YET!")
             Else
 
             End If
