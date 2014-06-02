@@ -141,7 +141,6 @@ Module Module1
             j += 1
         Next
         If j = 0 Then
-            sendChannel({" ", "Nothing found :("})
             GoogleDef(mail)
         End If
 
