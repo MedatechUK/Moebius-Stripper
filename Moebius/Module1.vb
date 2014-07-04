@@ -1,4 +1,4 @@
-﻿Imports System.Net.Sockets
+Imports System.Net.Sockets
 Imports System.Text
 Imports System.Text.RegularExpressions
 Imports System.Threading
@@ -197,6 +197,7 @@ Module Module1
 
         End Try
     End Sub
+
 
     Public Sub GoogleDef(ByVal mail As String)
         Dim j As Integer = 0
