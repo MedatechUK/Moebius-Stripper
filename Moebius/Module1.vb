@@ -2,8 +2,11 @@
 Imports System.Text
 Imports System.Text.RegularExpressions
 Imports System.Threading
+Imports System.Web.Script.Serialization
 
 Module Module1
+
+    Private _dictKey As String = "d0d90723-3851-4c65-8c04-dea85de4051f"
     Dim cout As System.IO.TextWriter = Console.Out
     Dim cin As System.IO.TextReader = Console.In
 
@@ -11,7 +14,7 @@ Module Module1
     Dim objIniFile As New IniFile(My.Computer.FileSystem.CurrentDirectory & "/settings.ini")
     Public ircserver As String = objIniFile.GetString("Moebius", "server", "irc.emerge-it.co.uk")
     Public port As Integer = objIniFile.GetInteger("Moebius", "port", 6667)
-    Public nick As String = objIniFile.GetString("Moebius", "nick", "Moebius Stripper")
+    Public nick As String = objIniFile.GetString("Moebius", "nick", "Moebius")
     Public channel As String = objIniFile.GetString("Moebius", "channel", "#dev")
     Public identifywithnickserv As Boolean = objIniFile.GetBoolean("Moebius", "ns-identify", False)
     Public nickservpass As String = objIniFile.GetString("Moebius", "ns-pass", "")
@@ -23,52 +26,246 @@ Module Module1
         Dim EP As New System.Net.IPEndPoint(ipHostInfo.AddressList(0), port)
         Dim registered As Boolean = False
         sock = New System.Net.Sockets.Socket(EP.Address.AddressFamily, Net.Sockets.SocketType.Stream, Net.Sockets.ProtocolType.Tcp)
-        sock.Connect(ircserver, port)
 
-        If sock.Connected Then
-            sendConnectCommands()
-            While Not registered
-                Dim mail As String = recv()
-                Debug.WriteLine(mail)
-                If mail.Contains("001") And mail.ToLower.Contains("welcome") And mail.ToLower.Contains("network") Then
-                    send("JOIN " & channel)
-                    registered = True
-                End If
-            End While
-        End If
 
-        While sock.Connected = True
-            Dim mail As String = recv()
-            Debug.WriteLine(mail)
-            If  mail.EndsWith(nick & ": shutdown -r now") Then
-                Debug.WriteLine("---> Disconnecting and reconnecting.")
-                send("QUIT")
-                sock.Close()
-                Thread.Sleep(50)
-                Application.Restart()
-            ElseIf mail.Contains(nick & ", --channel") Then
-                Dim foo = Split(mail, " ")
-                Dim bar = foo(foo.Length - 1)
-                send("PART " & channel)
-                channel = bar
-                send("JOIN " & channel)
-            ElseIf mail.Contains(nick & ": --help") Then
-                sendhelp(mail)
-            ElseIf mail.Contains(nick & ", eval") Then
-                Dim foo = Split(mail, " ")
-                Dim bar = foo(foo.Length - 1)
-                Dim baz = mathEval(bar)
-                Debug.WriteLine("---> Evaluating " & bar & " - result: " & baz)
-                send("PRIVMSG " & channel & " :" & baz)
-            ElseIf mail.Contains(nick & ", -R") Then
-                rickroll(mail)
-            Else
-
+        While True
+            sock.Connect(ircserver, port)
+            If sock.Connected Then
+                sendConnectCommands()
+                While Not registered
+                    Dim mail As String = recv()
+                    Debug.WriteLine(mail)
+                    If mail.Contains("001") And mail.ToLower.Contains("welcome") And mail.ToLower.Contains("network") Then
+                        send("JOIN " & channel)
+                        registered = True
+                        sendChannel({"MOEBIUS IN THE HIZZOUUUUSE"})
+                    End If
+                End While
             End If
 
+            While sock.Connected = True
+                Dim mail As String
+                Try
+                    mail = recv()
+                Catch ex As Exception
+                    Debug.Write(ex.Message)
+                End Try
 
+                Debug.WriteLine(mail)
+                If DateTime.Now.ToString("HH:mm") = "17:30" Then
+                    sendChannel({"GO HOME YOU GUIZE!!"})
+                End If
+                If mail.EndsWith(nick & ": shutdown -r now") Then
+                    Debug.WriteLine("---> Disconnecting and reconnecting.")
+                    send("QUIT")
+                    sock.Close()
+                    Thread.Sleep(50)
+                    Application.Restart()
+                ElseIf mail.Contains(nick & ", --channel") Then
+                    Dim foo = Split(mail, " ")
+                    Dim bar = foo(foo.Length - 1)
+                    send("PART " & channel)
+                    channel = bar
+                    send("JOIN " & channel)
+                ElseIf mail.Contains(nick & ": --help") Then
+                    sendhelp(mail)
+                ElseIf mail.Contains(nick & ", eval") Then
+                    Dim foo = Split(mail, " ")
+                    Dim bar = foo(foo.Length - 1)
+                    Dim baz = mathEval(bar)
+                    Debug.WriteLine("---> Evaluating " & bar & " - result: " & baz)
+                    sendChannel({baz})
+                ElseIf mail.Contains(nick & ", -R") Then
+                    rickroll(mail)
+
+                ElseIf mail.Contains("define:") Or mail.Contains("def:") Then
+                    Dim v As Boolean = False
+                    mail = mail.Split(">").Last
+
+                    If mail.Contains("def:") Then
+                        mail = mail.Replace("def", "").Split(":").Last
+                    Else
+                        v = True
+                        mail = mail.Replace("define", "").Split(":").Last
+                    End If
+                    mail = mail.Trim
+                    sendChannel({"defining: ", mail})
+                    DictDef(mail, v)
+
+                ElseIf mail.Contains("google:") Or mail.Contains("ggl:") Then
+                    mail = mail.Split(">").Last
+                    If mail.Contains("ggl:") Then
+                        mail = mail.Replace("ggl", "").Split(":").Last
+                    Else
+                        mail = mail.Replace("google", "").Split(":").Last
+                    End If
+                    mail = mail.Trim
+                    sendChannel({"googling: ", mail})
+                    Google(mail)
+
+                ElseIf mail.Contains("so:") Or mail.Contains("stackoverflow:") Then
+                    mail = mail.Split(">").Last
+                    If mail.Contains("so:") Then
+                        mail = mail.Replace("so", "").Split(":").Last
+                    Else
+                        mail = mail.Replace("stackoverflow", "").Split(":").Last
+                    End If
+                    mail = mail.Trim
+                    sendChannel({"searching SO: ", mail})
+                    Google("Stack Overflow " & mail)
+                ElseIf mail.Contains("ttl") Then
+                    TimeToLeave()
+                End If
+
+
+            End While
         End While
+
     End Sub
+
+    Public Sub sendChannel(args() As String)
+        send("PRIVMSG " & channel & " :" & String.Join("", args))
+    End Sub
+
+    'Friday feeling
+    Public Sub TimeToLeave()
+        Dim countdown As DateTime = (#5:30:00 PM# - DateTime.Now.TimeOfDay)
+        Dim hours As Integer = CInt(countdown.ToString("hh"))
+        Dim mins As Integer = CInt(countdown.ToString("mm"))
+        Dim hs As String = ""
+        Dim ms As String = ""
+
+        Select Case hours
+            Case 0
+                hs = " "
+            Case 1
+                hs = " hour, "
+            Case Else
+                hs = " hours, "
+        End Select
+
+        Select Case mins
+            Case 0
+                ms = " "
+            Case 1
+                ms = " minute "
+            Case Else
+                ms = " minutes "
+        End Select
+
+        Dim ret As String = hours & hs & mins & ms & "until end of day"
+
+
+        sendChannel({ret})
+
+    End Sub
+
+    Public Sub DictDef(ByVal mail As String, verbose As Boolean)
+
+        Dim ht As New Net.WebClient
+
+        Dim urlbuild = Function(word)
+                           Dim url As String = _
+                               "http://www.dictionaryapi.com/api/v1/references/collegiate/xml/"
+                           url &= word
+                           url &= "?key="
+                           url &= _dictKey
+                           Return url
+                       End Function
+
+        Dim response As New Xml.XmlDocument()
+        Try
+            response.LoadXml(ht.DownloadString(urlbuild(mail)))
+            Dim j As Integer = 0
+            For Each i As Xml.XmlNode In response.SelectNodes("*//dt/text()")
+                If Not verbose And j = 3 Then
+                    Exit Sub
+                End If
+
+                sendChannel({" ", j, ") ", i.InnerText.Replace(":", "")})
+                j += 1
+            Next
+            If j = 0 Then
+                GoogleDef(mail)
+            End If
+        Catch
+            Try
+                GoogleDef(mail)
+            Catch
+                Return
+            End Try
+
+        End Try
+    End Sub
+
+    Public Sub GoogleDef(ByVal mail As String)
+        Dim j As Integer = 0
+        Dim ht As New Net.WebClient
+        Dim urlbuild = Function(word)
+                           Dim url As String = _
+                               "http://suggestqueries.google.com/complete/search?client=chrome&q="
+                           url &= word
+                           Return url
+                       End Function
+
+        Dim jss As New JavaScriptSerializer
+
+        Dim x As List(Of Object) = jss.Deserialize(Of List(Of Object))( _
+        ht.DownloadString(urlbuild(mail)))
+
+        For Each i As String In x(1)
+            If j = 0 Then
+                sendChannel({"Did you mean: "})
+            End If
+            If j = 3 Then
+                Exit Sub
+            End If
+
+            sendChannel({" ", j, ") ", i, "?"})
+            j += 1
+        Next
+
+        If j = 0 Then
+            sendChannel({" ", "Not even google can help you now"})
+        End If
+
+
+    End Sub
+
+    Public Sub Google(ByVal mail As String)
+        Dim j As Integer = 0
+        Dim ht As New Net.WebClient
+
+        Dim urlbuild = Function(word)
+                           Dim url As String = _
+                               "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&q="
+                           url &= word
+                           Return url
+                       End Function
+
+        Dim y As String = urlbuild(mail)
+        Dim jss As New JavaScriptSerializer
+
+        Dim response As Dictionary(Of String, Object) = jss.Deserialize(Of Dictionary(Of String, Object))( _
+        ht.DownloadString(urlbuild(mail)))
+
+
+        For Each i As Dictionary(Of String, Object) In response("responseData")("results")
+
+            sendChannel({" ", j, ") ", i("titleNoFormatting")})
+            sendChannel({"    ", i("url")})
+            j += 1
+            If j = 3 Then
+                Exit Sub
+            End If
+        Next
+
+        If j = 0 Then
+            sendChannel({" ", "Not even google can help you now"})
+        End If
+    End Sub
+
+
 
     Public Sub sendConnectCommands()
         send("NICK " & nick)
@@ -105,6 +302,7 @@ Module Module1
     End Sub
 
     Function recv() As String
+
         Dim data(4096) As Byte
         Try
             sock.Receive(data, 4096, SocketFlags.None)
@@ -117,7 +315,7 @@ Module Module1
             If mail.Substring(0, 4) = "PING" Then
                 Dim pserv As String = mail.Substring(mail.IndexOf(":"), mail.Length - mail.IndexOf(":"))
                 pserv = pserv.TrimEnd(Chr(0))
-                mail = "PING from " & pserv & vbNewLine & "PONG to " & pserv
+                mail = "PING from " & pserv & " // " & "PONG to " & pserv
                 send("PONG " & pserv)
             ElseIf mail.Substring(mail.IndexOf(" ") + 1, 7) = "PRIVMSG" Then
                 Dim tmparr() As String = Nothing
@@ -130,13 +328,18 @@ Module Module1
             End If
         End If
 
-        Try
-            mail = mail.TrimEnd(Chr(0))
-            mail = mail.Remove(mail.LastIndexOf(vbLf), 1)
-            mail = mail.Remove(mail.LastIndexOf(vbCr), 1)
-        Catch ex As Exception
 
-        End Try
+        mail = mail.TrimEnd(Chr(0))
+        Dim lastLf As Integer = mail.LastIndexOf(vbLf)
+        If lastLf > -1 Then
+            mail = mail.Remove(lastLf, 1)
+        End If
+
+        Dim lastCr As Integer = mail.LastIndexOf(vbCr)
+        If lastCr > -1 Then
+            mail = mail.Remove(lastCr, 1)
+        End If
+
 
         Return mail
     End Function
